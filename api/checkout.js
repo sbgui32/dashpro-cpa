@@ -1,37 +1,32 @@
-const Stripe = require('stripe');
-const { createClient } = require('@supabase/supabase-js');
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 module.exports = async (req, res) => {
+  // Inicializar dentro do handler para evitar crash no cold start
+  const Stripe = require('stripe');
+  const { createClient } = require('@supabase/supabase-js');
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
   // CORS preflight
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'authorization,content-type');
-    return res.status(200).end();
-  }
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'authorization,content-type');
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Verificar token do usuário
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Token ausente' });
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ error: 'Token inválido' });
-
-  const appUrl = process.env.APP_URL || 'https://dashprocpa.vercel.app';
-
   try {
-    // Buscar customer_id existente
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Token inválido' });
+
+    const appUrl = process.env.APP_URL || 'https://dashpro-cpa.vercel.app';
+
     const { data: existingSub } = await supabase
       .from('subscriptions')
       .select('stripe_customer_id')
@@ -43,7 +38,7 @@ module.exports = async (req, res) => {
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
-        metadata: { user_id: user.id, supabase_uid: user.id }
+        metadata: { user_id: user.id }
       });
       customerId = customer.id;
     }
@@ -62,14 +57,11 @@ module.exports = async (req, res) => {
       cancel_url:  `${appUrl}/app.html?payment=canceled`,
       allow_promotion_codes: true,
       locale: 'pt-BR',
-      custom_text: {
-        submit: { message: 'Seu cartão só será cobrado após os 3 dias de teste gratuito.' }
-      }
     });
 
     return res.json({ url: session.url });
   } catch (err) {
-    console.error('[checkout]', err.message);
+    console.error('[checkout error]', err.message);
     return res.status(500).json({ error: err.message });
   }
 };
