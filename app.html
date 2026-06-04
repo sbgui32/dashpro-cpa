@@ -3014,6 +3014,37 @@ function renderMonLog(evs){
 // Escuta a extensão mandar eventos em tempo real
 window.addEventListener('dp_events_synced', ()=>{ if(curTab==='monitor') renderMonitor(); });
 
+function importMonitorFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const backup = JSON.parse(e.target.result);
+      const incoming = backup.data?.dp_platform_events || [];
+      if(!incoming.length){ alert('Nenhum evento encontrado no arquivo.'); return; }
+
+      // Mescla com eventos existentes sem duplicar
+      loadMonitorEvents();
+      const existingIds = new Set(monEvents.map(ev => ev.id || (ev.eventType+ev.platform+ev.timestamp)));
+      const novos = incoming.filter(ev => !existingIds.has(ev.id || (ev.eventType+ev.platform+ev.timestamp)));
+      const merged = [...novos, ...monEvents].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,500);
+      localStorage.setItem('dp_platform_events', JSON.stringify(merged));
+      monEvents = merged;
+      renderMonitor();
+
+      // Feedback
+      const lbl = event.target.closest('label');
+      if(lbl){ const orig=lbl.innerHTML; lbl.innerHTML=`✅ ${novos.length} novos eventos`; setTimeout(()=>lbl.innerHTML=orig,3000); }
+      if(novos.length===0) alert('Todos os eventos já estavam registrados.');
+    } catch(err){
+      alert('❌ Arquivo inválido: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value=''; // permite reimportar o mesmo arquivo
+}
+
 // =================== BACKUP ===================
 function openBackup(){
   const modal = document.getElementById('backup-modal');
@@ -3130,6 +3161,10 @@ function importBackup(event){
         <option value="0">Tudo</option>
       </select>
       <button class="btn btn-o" onclick="syncMonitorEvents()" title="Sincronizar com extensão">🔄 Sincronizar</button>
+      <label class="btn" style="background:var(--gr);color:#000;font-weight:700;cursor:pointer;position:relative;overflow:hidden" title="Importar dashpro-events.json do Monitor Agent">
+        📂 Importar eventos
+        <input type="file" accept=".json" onchange="importMonitorFile(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer">
+      </label>
       <button class="btn btn-d btn-sm" onclick="clearMonitorEvents()">🗑️ Limpar</button>
     </div>
 
