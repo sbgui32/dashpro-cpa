@@ -241,13 +241,10 @@ textarea{resize:vertical;min-height:70px}
 <body>
 
 <!-- ==================== DASHPRO TRIAL BANNER ==================== -->
-<div id="dp-trial-banner" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#10b981,#059669);color:#000;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;z-index:10000;font-weight:600;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.3);height:44px">
-  <div>
-    <span id="dp-trial-text">✓ Você está usando a versão de teste — 3 dias grátis</span>
-    <span id="dp-trial-days" style="margin-left:12px;font-weight:700"></span>
-  </div>
-  <a href="javascript:void(0)" onclick="dpOpenKiwify()" style="background:rgba(0,0,0,.2);color:#000;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:700;white-space:nowrap;cursor:pointer;transition:all .2s">
-    Continuar agora →
+<div style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#f85149,#da3633);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;z-index:10000;font-weight:700;font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,.4)">
+  <span>⚠️ Versão de Teste — Clique para assinar</span>
+  <a href="javascript:void(0)" onclick="window.open('https://pay.kiwify.com.br/gPxmpEA', '_blank')" style="background:rgba(255,255,255,.25);color:#fff;padding:8px 16px;border-radius:7px;text-decoration:none;font-weight:800;white-space:nowrap;cursor:pointer">
+    🔗 Assinar Agora
   </a>
 </div>
 
@@ -3307,73 +3304,19 @@ function importBackup(event){
   </div>
 </div>
 
-<!-- ==================== DASHPRO TRIAL SCRIPT ==================== -->
+<!-- ==================== DASHPRO SIMPLE SETUP ==================== -->
 <script>
-(function(){
-  const TRIAL_DAYS = 3;
-  const TRIAL_KEY = 'dashpro_trial_start';
-  const BANNER = document.getElementById('dp-trial-banner');
-  const BANNER_TEXT = document.getElementById('dp-trial-text');
-  const BANNER_DAYS = document.getElementById('dp-trial-days');
-  const WA_BTN = document.getElementById('whatsapp-btn');
+// Ajustar padding do body para o banner não cobrir o header
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.style.paddingTop = '44px';
 
-  function dpOpenKiwify(){
-    window.open(DASHPRO.kiwifyUrl, '_blank');
-  }
-  window.dpOpenKiwify = dpOpenKiwify;
-
-  function updateTrialBanner(){
-    const startStr = localStorage.getItem(TRIAL_KEY);
-    if(!startStr){
-      // Primeira vez — iniciar trial
-      const now = new Date();
-      localStorage.setItem(TRIAL_KEY, now.toISOString());
-      BANNER.style.display = 'flex';
-      BANNER.style.paddingTop = '44px'; // offset do header
-      updateTrialBanner(); // Chamar de novo para atualizar
-      return;
-    }
-
-    const start = new Date(startStr);
-    const now = new Date();
-    const elapsedMs = now - start;
-    const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-    const remainingDays = TRIAL_DAYS - elapsedDays;
-
-    if(remainingDays > 0){
-      // Trial ainda ativo
-      BANNER.style.display = 'flex';
-      document.body.style.paddingTop = '44px'; // Dar espaço para o banner
-
-      const hours = Math.floor((remainingDays % 1) * 24);
-      const daysInt = Math.floor(remainingDays);
-      BANNER_DAYS.textContent = `${daysInt}d ${hours}h restante`;
-      BANNER_TEXT.textContent = '✓ Você está usando a versão de teste';
-    } else {
-      // Trial expirado
-      BANNER.style.display = 'flex';
-      BANNER.style.background = 'linear-gradient(90deg,#f85149,#da3633)';
-      BANNER.style.paddingTop = '44px';
-      BANNER_TEXT.textContent = '❌ Seu período de teste expirou!';
-      BANNER_DAYS.textContent = 'Assine agora para continuar';
-      document.body.style.paddingTop = '44px';
-    }
-  }
-
-  // Atualizar banner ao carregar
-  updateTrialBanner();
-
-  // Atualizar a cada 1 minuto
-  setInterval(updateTrialBanner, 60000);
-
-  // Mostrar WhatsApp após fazer upgrade (quando vir de Kiwify)
+  // Mostrar WhatsApp se vier de Kiwify
   const params = new URLSearchParams(window.location.search);
-  if(params.has('upgrade') || params.has('pago')){
-    WA_BTN.style.display = 'inline-flex';
-  }
-})();
+  const wbtn = document.getElementById('whatsapp-btn');
+  if(wbtn) wbtn.style.display = 'inline-flex';
+});
 </script>
-<!-- ==================== FIM TRIAL SCRIPT ==================== -->
+<!-- ==================== FIM SETUP ==================== -->
 
 </body>
 </html>
