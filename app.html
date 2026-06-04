@@ -287,11 +287,11 @@ textarea{resize:vertical;min-height:70px}
     </div>
   </div>
 
-  <!-- PAYMENT -->
+  <!-- PAYMENT / UPGRADE -->
   <div id="dp-payment" class="dp-screen">
     <div class="dp-card">
-      <div class="dp-h2">Ativar acesso</div>
-      <div class="dp-sub">Comece com <strong style="color:#10b981">3 dias grátis</strong>, depois apenas:</div>
+      <div class="dp-h2" id="dp-payment-title">Trial expirado</div>
+      <div class="dp-sub" id="dp-payment-sub">Assine para continuar usando a ferramenta:</div>
       <div class="dp-price-box">
         <div class="dp-price-big">R$ 34<span>,90/mês</span></div>
         <div class="dp-price-note">Cobrado mensalmente · Cancele quando quiser</div>
@@ -303,8 +303,8 @@ textarea{resize:vertical;min-height:70px}
         <li>Funciona como app no computador</li>
       </ul>
       <div id="dp-p-err" class="dp-err"></div>
-      <button id="dp-p-btn" class="dp-btn" onclick="dpCheckout()">🚀 Ativar agora — 3 dias grátis</button>
-      <div class="dp-trial-note">Cartão necessário · Sem cobrança nos primeiros 3 dias<br>Cancele antes e não será cobrado</div>
+      <button id="dp-p-btn" class="dp-btn" onclick="dpUpgrade()">💳 Assinar agora</button>
+      <div class="dp-trial-note" id="dp-trial-note"></div>
       <hr class="dp-sep">
       <div class="dp-link"><a onclick="dpLogout()">Usar outra conta</a></div>
     </div>
@@ -330,7 +330,7 @@ textarea{resize:vertical;min-height:70px}
     <div><div class="hdr-title">Gerenciador de Chaves PIX</div><div class="hdr-sub">Local · Offline · Salvamento automático</div></div>
   </div>
   <div class="hdr-right" style="display:flex;align-items:center;gap:12px">
-    <a id="whatsapp-btn" href="WHATSAPP_LINK_AQUI" target="_blank" rel="noopener"
+    <a id="whatsapp-btn" href="https://wa.me/5532984914993" target="_blank" rel="noopener"
       style="display:none;align-items:center;gap:6px;background:#25d366;color:#000;font-size:12px;font-weight:700;padding:6px 12px;border-radius:7px;text-decoration:none;white-space:nowrap">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       Grupo VIP
@@ -2864,8 +2864,9 @@ db.banks.forEach(b=>{ exBankTable[b.id]=true; });
 renderAll();renderAlert();
 setInterval(renderAlert, 60000); // atualiza a cada minuto
 
-// =================== MONITOR DE BLOCK ===================
 // =================== MONITOR ===================
+const MON_DAYS_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const MON_DAYS_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 let monEvents = [];
 
 function loadMonitorEvents(){
@@ -2879,11 +2880,15 @@ function saveMonitorEvents(){
 
 function logMonEvent(platform, eventType){
   loadMonitorEvents();
+  const now = new Date();
   const ev = {
     id: Date.now(),
     eventType,
     platform,
-    timestamp: new Date().toISOString(),
+    timestamp: now.toISOString(),
+    hour: now.getHours(),
+    dayOfWeek: now.getDay(),
+    dayName: MON_DAYS_FULL[now.getDay()]
   };
   monEvents.unshift(ev);
   if(monEvents.length > 500) monEvents.pop();
@@ -2901,7 +2906,7 @@ function logMonEvent(platform, eventType){
 }
 
 function clearMonitorEvents(){
-  if(!confirm('Limpar todo o histórico?')) return;
+  if(!confirm('Limpar todo o histórico de eventos?')) return;
   localStorage.removeItem('dp_platform_events');
   monEvents=[];
   renderMonitor();
@@ -2909,73 +2914,152 @@ function clearMonitorEvents(){
 
 function renderMonitor(){
   loadMonitorEvents();
-  renderMonChartPlat(monEvents);
-  renderMonChartHour(monEvents);
+  renderMonKPIs(monEvents);
+  renderMonRankPlat(monEvents);
+  renderMonRankDay(monEvents);
+  renderMonRankHour(monEvents);
   renderMonLog(monEvents);
 }
 
-function renderMonChartPlat(evs){
-  const el=$('mon-chart-plat'); if(!el)return;
+function renderMonKPIs(evs){
+  const el=document.getElementById('mon-kpis'); if(!el)return;
+  const today=new Date().toDateString();
+  const todayEvs=evs.filter(e=>new Date(e.timestamp).toDateString()===today);
+  const blocksToday=todayEvs.filter(e=>e.eventType==='block').length;
+  const discToday=todayEvs.filter(e=>e.eventType==='disconnect').length;
+  const totalBlocks=evs.filter(e=>e.eventType==='block').length;
+  const totalDisc=evs.filter(e=>e.eventType==='disconnect').length;
+  const platCount={};
+  evs.forEach(e=>{ platCount[e.platform]=(platCount[e.platform]||0)+1; });
+  const topPlat=Object.entries(platCount).sort((a,b)=>b[1]-a[1])[0];
+  const hourCount={};
+  evs.forEach(e=>{ const h=new Date(e.timestamp).getHours(); hourCount[h]=(hourCount[h]||0)+1; });
+  const topHour=Object.entries(hourCount).sort((a,b)=>b[1]-a[1])[0];
+  el.innerHTML=`
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
+      <div style="font-size:10px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🚫 Blocks Hoje</div>
+      <div style="font-size:28px;font-weight:700;color:#f85149">${blocksToday}</div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:2px">${totalBlocks} total registrado</div>
+    </div>
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
+      <div style="font-size:10px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⚠️ Disconnects Hoje</div>
+      <div style="font-size:28px;font-weight:700;color:#e3b341">${discToday}</div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:2px">${totalDisc} total registrado</div>
+    </div>
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
+      <div style="font-size:10px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🔥 + Problemática</div>
+      <div style="font-size:28px;font-weight:700;color:var(--tx)">${topPlat?topPlat[0]:'—'}</div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:2px">${topPlat?topPlat[1]+' incidente'+(topPlat[1]!==1?'s':''):'Sem dados ainda'}</div>
+    </div>
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
+      <div style="font-size:10px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🕐 Hora de Pico</div>
+      <div style="font-size:28px;font-weight:700;color:var(--bl)">${topHour?topHour[0]+'h':'—'}</div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:2px">${topHour?topHour[1]+' evento'+(topHour[1]!==1?'s':''):'Sem dados ainda'}</div>
+    </div>`;
+}
+
+function renderMonRankPlat(evs){
+  const el=document.getElementById('mon-rank-plat'); if(!el)return;
+  const PLATS=['VOY','91','W1','WE','A8','DZ'];
   const pc={};
-  evs.forEach(e=>{ if(!pc[e.platform])pc[e.platform]={block:0,disconnect:0}; if(pc[e.platform][e.eventType]!==undefined)pc[e.platform][e.eventType]++; });
-  const entries=Object.entries(pc).sort((a,b)=>(b[1].block+b[1].disconnect)-(a[1].block+a[1].disconnect));
-  if(!entries.length){ el.innerHTML='<div style="color:var(--tx2);font-size:12px;text-align:center;padding:20px">Nenhum evento registrado ainda</div>'; return; }
-  el.innerHTML=entries.map(([plat,c])=>{
-    const tot=c.block+c.disconnect;
-    const bp=tot>0?(c.block/tot*100).toFixed(1):0;
-    const dp=tot>0?(c.disconnect/tot*100).toFixed(1):0;
-    return `<div style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-size:13px;font-weight:700">${plat}</span>
-        <span style="font-size:11px;color:var(--tx2)">${tot} evento${tot>1?'s':''}</span>
+  PLATS.forEach(p=>pc[p]={block:0,disconnect:0});
+  evs.forEach(e=>{ if(pc[e.platform]&&pc[e.platform][e.eventType]!==undefined)pc[e.platform][e.eventType]++; });
+  const maxTotal=Math.max(1,...PLATS.map(p=>pc[p].block+pc[p].disconnect));
+  if(PLATS.every(p=>pc[p].block+pc[p].disconnect===0)){
+    el.innerHTML='<div style="padding:20px 0;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento registrado ainda</div>'; return;
+  }
+  el.innerHTML=PLATS.map(p=>{
+    const total=pc[p].block+pc[p].disconnect;
+    const bPct=(pc[p].block/maxTotal)*100;
+    const dPct=(pc[p].disconnect/maxTotal)*100;
+    const bStr=pc[p].block>0?`<span style="color:#f85149;font-weight:700">${pc[p].block} bl</span>`:'';
+    const dStr=pc[p].disconnect>0?`<span style="color:#e3b341;font-weight:700;margin-left:6px">${pc[p].disconnect} dc</span>`:'';
+    return `<div style="margin-bottom:11px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:700">${p}</span>
+        <span style="font-size:12px">${total>0?(bStr+(bStr&&dStr?' ':'')+dStr):'<span style="color:var(--tx2)">0</span>'}</span>
       </div>
-      <div style="height:20px;background:var(--bd);border-radius:4px;overflow:hidden;display:flex">
-        <div style="width:${bp}%;background:#f85149" title="Bloqueios: ${c.block}"></div>
-        <div style="width:${dp}%;background:#e3b341" title="Disconnects: ${c.disconnect}"></div>
-      </div>
-      <div style="display:flex;gap:12px;margin-top:3px;font-size:10px">
-        <span style="color:#f85149">🚫 ${c.block} bloq.</span>
-        <span style="color:#e3b341">⚠️ ${c.disconnect} disc.</span>
+      <div style="height:7px;background:var(--sf2);border-radius:4px;overflow:hidden;display:flex">
+        <div style="width:${bPct}%;background:#f85149;transition:width .3s"></div>
+        <div style="width:${dPct}%;background:#e3b341;transition:width .3s"></div>
       </div>
     </div>`;
   }).join('');
 }
 
-function renderMonChartHour(evs){
-  const el=$('mon-chart-hour'); if(!el)return;
-  const hc=Array.from({length:24},(_,i)=>({h:i,block:0,disconnect:0}));
-  evs.forEach(e=>{ const h=new Date(e.timestamp).getHours(); if(hc[h][e.eventType]!==undefined)hc[h][e.eventType]++; });
-  const mx=Math.max(...hc.map(h=>h.block+h.disconnect),1);
-  const hasData=hc.some(h=>h.block+h.disconnect>0);
-  if(!hasData){ el.innerHTML='<div style="color:var(--tx2);font-size:12px;text-align:center;padding:20px">Nenhum evento ainda</div>'; return; }
-  el.innerHTML=`<div style="display:flex;align-items:flex-end;gap:2px;height:68px;margin-bottom:4px">${hc.map(h=>{
-    const tot=h.block+h.disconnect,pct=tot>0?(tot/mx*100):2,col=tot>=3?'#f85149':tot>0?'#e3b341':'var(--bd)';
-    return `<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end" title="${h.h}h: ${tot}"><div style="width:100%;background:${col};height:${pct}%;min-height:${tot>0?'4px':'2px'};border-radius:2px 2px 0 0"></div></div>`;
-  }).join('')}</div>
-  <div style="display:flex;gap:2px">${hc.map((h,i)=>`<div style="flex:1;text-align:center;font-size:8px;color:${h.block+h.disconnect>0?'var(--tx)':'var(--tx2)'}">${i%6===0?i+'h':''}</div>`).join('')}</div>
-  <div style="display:flex;gap:14px;margin-top:6px;font-size:10px;color:var(--tx2)"><span><span style="color:#f85149">■</span> 3+</span><span><span style="color:#e3b341">■</span> 1–2</span></div>`;
+function renderMonRankDay(evs){
+  const el=document.getElementById('mon-rank-day'); if(!el)return;
+  const dc=Array.from({length:7},(_,i)=>({day:i,name:MON_DAYS_SHORT[i],count:0}));
+  evs.forEach(e=>{ const d=new Date(e.timestamp).getDay(); dc[d].count++; });
+  const max=Math.max(1,...dc.map(d=>d.count));
+  if(dc.every(d=>d.count===0)){
+    el.innerHTML='<div style="padding:20px 0;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento registrado ainda</div>'; return;
+  }
+  const sorted=[...dc].sort((a,b)=>b.count-a.count);
+  el.innerHTML=sorted.map((d,i)=>`
+    <div style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:${i===0?'700':'400'};color:${i===0?'var(--tx)':'var(--tx2)'}">${d.name}</span>
+        <span style="font-size:12px;color:${d.count>0?(i===0?'#f85149':'var(--tx)'):'var(--tx2)'}">+${d.count}</span>
+      </div>
+      <div style="height:5px;background:var(--sf2);border-radius:3px">
+        <div style="width:${(d.count/max)*100}%;height:100%;background:${i===0?'#f85149':'var(--bl)'};border-radius:3px;transition:width .3s"></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderMonRankHour(evs){
+  const el=document.getElementById('mon-rank-hour'); if(!el)return;
+  const hc={};
+  evs.forEach(e=>{ const h=new Date(e.timestamp).getHours(); hc[h]=(hc[h]||0)+1; });
+  const sorted=Object.entries(hc).map(([h,c])=>({h:parseInt(h),count:c})).sort((a,b)=>b.count-a.count).slice(0,7);
+  const max=Math.max(1,...sorted.map(h=>h.count));
+  if(!sorted.length){
+    el.innerHTML='<div style="padding:20px 0;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento registrado ainda</div>'; return;
+  }
+  el.innerHTML=sorted.map((h,i)=>`
+    <div style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:${i===0?'700':'400'};color:${i===0?'var(--tx)':'var(--tx2)'}">🕐 ${String(h.h).padStart(2,'0')}:00</span>
+        <span style="font-size:12px;color:${i===0?'#e3b341':'var(--tx2)'}">${h.count} evento${h.count!==1?'s':''}</span>
+      </div>
+      <div style="height:5px;background:var(--sf2);border-radius:3px">
+        <div style="width:${(h.count/max)*100}%;height:100%;background:${i===0?'#e3b341':'var(--gr)'};border-radius:3px;transition:width .3s"></div>
+      </div>
+    </div>`).join('');
 }
 
 function renderMonLog(evs){
-  const el=$('mon-log'); const cnt=$('mon-count'); if(!el)return;
+  const el=document.getElementById('mon-log');
+  const cnt=document.getElementById('mon-count');
+  if(!el)return;
   if(cnt) cnt.textContent=`${evs.length} evento${evs.length!==1?'s':''}`;
-  if(!evs.length){ el.innerHTML='<div style="padding:24px;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento registrado ainda.<br>Use os botões acima para marcar blocks e disconnects.</div>'; return; }
+  if(!evs.length){
+    el.innerHTML='<div style="padding:28px;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento registrado ainda.<br>Use os botões acima para marcar blocks e disconnects.</div>';
+    return;
+  }
   const sorted=[...evs].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-  el.innerHTML=sorted.map((ev,i)=>{
-    const dt=new Date(ev.timestamp);
-    const d=dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'});
-    const t=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=sorted.map((ev,idx)=>{
+    const d=new Date(ev.timestamp);
+    const dayName=ev.dayName||MON_DAYS_FULL[d.getDay()];
+    const time=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const dateStr=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
     const isB=ev.eventType==='block';
-    const dot=isB?'#f85149':'#e3b341';
-    const badge=isB
-      ?`<span style="background:rgba(248,81,73,.12);color:#f85149;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600">🚫 Block</span>`
-      :`<span style="background:rgba(227,179,65,.12);color:#e3b341;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600">⚠️ Disconnect</span>`;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--bg)">
-      <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-      <div style="font-weight:700;min-width:32px;font-size:13px">${ev.platform}</div>
-      ${badge}
-      <div style="margin-left:auto;color:var(--tx2);font-size:11px;white-space:nowrap">${d} ${t}</div>
-      <button onclick="removeMonEvent(${i})" style="background:none;border:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:0 2px;opacity:.5" title="Remover">✕</button>
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--sf2);font-size:12px">
+      <div style="width:3px;height:38px;background:${isB?'#f85149':'#e3b341'};border-radius:2px;flex-shrink:0"></div>
+      <div style="width:34px;height:34px;background:${isB?'rgba(248,81,73,.1)':'rgba(227,179,65,.1)'};border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${isB?'🚫':'⚠️'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;margin-bottom:2px">
+          <span style="color:${isB?'#f85149':'#e3b341'}">${isB?'Block':'Disconnect'}</span>
+          <span style="background:var(--sf2);color:var(--tx);font-size:11px;padding:1px 7px;border-radius:99px;margin-left:7px;font-weight:700">${ev.platform}</span>
+        </div>
+        <div style="color:var(--tx2)">
+          <span style="font-weight:600;color:var(--tx)">${dayName}</span>
+          <span style="margin:0 5px;opacity:.4">·</span>
+          <span>${dateStr} às ${time}</span>
+        </div>
+      </div>
+      <button onclick="removeMonEvent(${idx})" style="background:none;border:none;color:var(--tx2);cursor:pointer;padding:4px 6px;font-size:13px;opacity:.4;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.4" title="Remover">✕</button>
     </div>`;
   }).join('');
 }
@@ -3085,83 +3169,106 @@ function importBackup(event){
   </a>
 </footer>
 <!-- ==================== MONITOR TAB ==================== -->
-<div id="tab-monitor" class="hidden layout" style="flex-direction:column">
-  <div class="main" style="padding:18px;max-width:900px;margin:0 auto;width:100%">
+<div id="tab-monitor" class="hidden" style="overflow-y:auto;height:calc(100vh - 97px);padding:18px">
+  <div style="max-width:1100px;margin:0 auto">
 
-    <!-- Título -->
-    <div style="margin-bottom:16px">
-      <div style="font-size:16px;font-weight:800;margin-bottom:2px">🛡️ Monitoramento de Block</div>
-      <div style="font-size:12px;color:var(--tx2)">Registre manualmente quando uma plataforma tomar block ou disconnect</div>
+    <!-- KPI Cards -->
+    <div id="mon-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+
+    <!-- Botões de registro -->
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">⚡ Registrar evento manualmente</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+        <!-- VOY -->
+        <div id="mon-card-VOY" style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:8px">VOY</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="logMonEvent('VOY','block')" style="background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">🚫 Block</button>
+            <button onclick="logMonEvent('VOY','disconnect')" style="background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+          </div>
+        </div>
+        <!-- 91 -->
+        <div id="mon-card-91" style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:8px">91</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="logMonEvent('91','block')" style="background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">🚫 Block</button>
+            <button onclick="logMonEvent('91','disconnect')" style="background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+          </div>
+        </div>
+        <!-- W1 -->
+        <div id="mon-card-W1" style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:8px">W1</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="logMonEvent('W1','block')" style="background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">🚫 Block</button>
+            <button onclick="logMonEvent('W1','disconnect')" style="background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+          </div>
+        </div>
+        <!-- WE -->
+        <div id="mon-card-WE" style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:8px">WE</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="logMonEvent('WE','block')" style="background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">🚫 Block</button>
+            <button onclick="logMonEvent('WE','disconnect')" style="background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+          </div>
+        </div>
+        <!-- A8 -->
+        <div id="mon-card-A8" style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:8px">A8</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="logMonEvent('A8','block')" style="background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">🚫 Block</button>
+            <button onclick="logMonEvent('A8','disconnect')" style="background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+          </div>
+        </div>
+        <!-- DZ -->
+        <div id="mon-card-DZ" style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:8px">DZ</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="logMonEvent('DZ','block')" style="background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">🚫 Block</button>
+            <button onclick="logMonEvent('DZ','disconnect')" style="background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Grid de plataformas -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
-      <div id="mon-card-VOY" class="mon-plat-card" onclick="" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
-        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">VOY</div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button onclick="logMonEvent('VOY','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
-          <button onclick="logMonEvent('VOY','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
-        </div>
-      </div>
-      <div id="mon-card-91" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
-        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">91</div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button onclick="logMonEvent('91','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
-          <button onclick="logMonEvent('91','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
-        </div>
-      </div>
-      <div id="mon-card-W1" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
-        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">W1</div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button onclick="logMonEvent('W1','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
-          <button onclick="logMonEvent('W1','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
-        </div>
-      </div>
-      <div id="mon-card-WE" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
-        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">WE</div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button onclick="logMonEvent('WE','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
-          <button onclick="logMonEvent('WE','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
-        </div>
-      </div>
-      <div id="mon-card-A8" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
-        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">A8</div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button onclick="logMonEvent('A8','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
-          <button onclick="logMonEvent('A8','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
-        </div>
-      </div>
-      <div id="mon-card-DZ" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
-        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">DZ</div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button onclick="logMonEvent('DZ','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
-          <button onclick="logMonEvent('DZ','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
-        </div>
-      </div>
-    </div>
+    <!-- Análise — 3 colunas -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
 
-    <!-- Gráficos -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <!-- Plataformas ranking -->
       <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">📊 Eventos por plataforma</div>
-        <div id="mon-chart-plat"></div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+          <span>📊 Plataformas por Incidente</span>
+          <div style="display:flex;gap:8px;font-size:10px;color:var(--tx2)">
+            <span style="color:#f85149">■ Block</span>
+            <span style="color:#e3b341">■ Disc.</span>
+          </div>
+        </div>
+        <div id="mon-rank-plat"></div>
       </div>
+
+      <!-- Dia da semana -->
       <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">🕐 Eventos por horário</div>
-        <div id="mon-chart-hour"></div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:14px">📅 Por Dia da Semana</div>
+        <div id="mon-rank-day"></div>
       </div>
+
+      <!-- Horário de pico -->
+      <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:14px">🕐 Horários de Pico</div>
+        <div id="mon-rank-hour"></div>
+      </div>
+
     </div>
 
-    <!-- Log -->
-    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden">
+    <!-- Log completo -->
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:18px">
       <div style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;font-weight:700">📋 Histórico</span>
+        <span style="font-size:12px;font-weight:700">📋 Histórico Completo</span>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="mon-count" style="font-size:11px;color:var(--tx2)"></span>
           <button onclick="clearMonitorEvents()" style="background:none;border:1px solid var(--bd);color:var(--tx2);border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer">🗑️ Limpar</button>
         </div>
       </div>
-      <div id="mon-log" style="max-height:320px;overflow-y:auto"></div>
+      <div id="mon-log" style="max-height:360px;overflow-y:auto"></div>
     </div>
 
   </div>
@@ -3197,6 +3304,7 @@ function importBackup(event){
 <script>
 (function(){
   const _sb = window.supabase.createClient(DASHPRO.supabaseUrl, DASHPRO.supabaseKey);
+  const apiBase = 'https://dashpro-cpa.vercel.app/api';
 
   function dpShow(screenId){
     document.querySelectorAll('.dp-screen').forEach(s=>s.classList.remove('active'));
@@ -3232,17 +3340,27 @@ function importBackup(event){
     dpShow('dp-loading');
     const {data:sub}=await _sb
       .from('subscriptions')
-      .select('status,trial_end,current_period_end')
+      .select('status,trial_end,current_period_end,is_trial_only')
       .eq('user_id',session.user.id)
       .in('status',['active','trialing'])
       .maybeSingle();
+
     if(sub){
       const now=new Date();
       const end=sub.current_period_end?new Date(sub.current_period_end):null;
-      const valid=sub.status==='active'||(sub.status==='trialing'&&(!end||end>now));
-      if(valid){dpHideOverlay();return;}
+
+      // Verificar se trial/subscription está válido
+      if(sub.status==='active'||end>now){
+        dpHideOverlay();
+        return;
+      }
     }
+
+    // Trial expirado ou não tem subscription — mostrar upgrade
     dpShow('dp-payment');
+    document.getElementById('dp-payment-title').textContent='Seu trial expirou';
+    document.getElementById('dp-payment-sub').textContent='Assine agora para continuar usando:';
+    document.getElementById('dp-trial-note').textContent='Sem compromisso · Cancele quando quiser';
   }
 
   async function dpLogin(){
@@ -3276,7 +3394,8 @@ function importBackup(event){
     btn.disabled=false;btn.textContent='Criar conta e começar';
     if(error){err.textContent=error.message;return;}
     if(data.session){
-      dpShow('dp-payment');
+      // Ativar trial automaticamente
+      await dpActivateTrial(data.session);
     } else {
       dpShow('dp-login');
       document.getElementById('dp-l-err').style.color='#10b981';
@@ -3285,7 +3404,36 @@ function importBackup(event){
   }
   window.dpRegister=dpRegister;
 
-  async function dpCheckout(){
+  async function dpActivateTrial(session){
+    dpShow('dp-loading');
+    document.querySelector('#dp-loading').innerHTML='<span class="dp-spin"></span> Ativando seu trial de 3 dias...';
+
+    try{
+      const res=await fetch(`${apiBase}/check-trial`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'}
+      });
+      const json=await res.json();
+
+      if(json.canTrial){
+        // Trial ativado com sucesso
+        await new Promise(r=>setTimeout(r,1500));
+        dpHideOverlay();
+      } else {
+        // Não pode fazer trial (IP já tem trial ativo)
+        dpShow('dp-payment');
+        document.getElementById('dp-payment-title').textContent='Limite de trial atingido';
+        document.getElementById('dp-payment-sub').textContent=json.reason||'Você já utilizou o trial neste dispositivo. Assine para continuar:';
+        document.getElementById('dp-trial-note').textContent='';
+      }
+    }catch(e){
+      console.error('[dpActivateTrial] Error:', e);
+      dpShow('dp-payment');
+      document.getElementById('dp-p-err').textContent='Erro ao ativar trial: '+e.message;
+    }
+  }
+
+  async function dpUpgrade(){
     const btn=document.getElementById('dp-p-btn');
     const err=document.getElementById('dp-p-err');
     err.textContent='';
@@ -3294,7 +3442,7 @@ function importBackup(event){
     const {data:{session}}=await _sb.auth.getSession();
     if(!session){dpShow('dp-login');return;}
     try{
-      const res=await fetch(DASHPRO.checkoutUrl,{
+      const res=await fetch(`${apiBase}/upgrade-trial`,{
         method:'POST',
         headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'}
       });
@@ -3304,10 +3452,10 @@ function importBackup(event){
     }catch(e){
       err.textContent=e.message;
       btn.disabled=false;
-      btn.innerHTML='🚀 Ativar agora — 3 dias grátis';
+      btn.innerHTML='💳 Assinar agora';
     }
   }
-  window.dpCheckout=dpCheckout;
+  window.dpUpgrade=dpUpgrade;
 
   async function dpLogout(){
     await _sb.auth.signOut();
