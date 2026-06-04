@@ -335,9 +335,48 @@ textarea{resize:vertical;min-height:70px}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       Grupo VIP
     </a>
+    <button onclick="openBackup()" title="Backup / Restaurar dados"
+      style="background:var(--sf);border:1px solid var(--bd);color:var(--tx);border-radius:7px;padding:6px 11px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;font-weight:600">
+      💾 Backup
+    </button>
     <div style="text-align:right;font-size:12px;color:var(--tx2)"><span class="dot">●</span> Dados salvos<br>Máx. 5 chaves por banco</div>
   </div>
 </header>
+
+<!-- ==================== MODAL BACKUP ==================== -->
+<div id="backup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:24px;width:420px;max-width:95vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div style="font-size:16px;font-weight:800">💾 Backup de Dados</div>
+        <div style="font-size:11px;color:var(--tx2);margin-top:2px">Exporte ou restaure todos os seus dados</div>
+      </div>
+      <button onclick="closeBackup()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;padding:4px">✕</button>
+    </div>
+
+    <!-- Exportar -->
+    <div style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:16px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">📤 Exportar backup</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:12px">Baixa um arquivo <code>.json</code> com todas as suas chaves PIX, ciclos financeiros e eventos de monitoramento.</div>
+      <button onclick="exportBackup()" style="background:var(--gr);color:#000;border:none;border-radius:7px;padding:9px 18px;font-weight:700;font-size:13px;cursor:pointer;width:100%">
+        ⬇️ Baixar backup agora
+      </button>
+    </div>
+
+    <!-- Importar -->
+    <div style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:16px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">📥 Restaurar backup</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:12px">Selecione um arquivo de backup gerado anteriormente. <strong style="color:#f85149">Atenção: substitui todos os dados atuais.</strong></div>
+      <label style="display:block;background:var(--sf);border:1px dashed var(--bd);border-radius:7px;padding:12px;text-align:center;cursor:pointer;font-size:12px;color:var(--tx2)">
+        📂 Clique para selecionar o arquivo .json
+        <input type="file" accept=".json" onchange="importBackup(event)" style="display:none">
+      </label>
+    </div>
+
+    <!-- Info último backup -->
+    <div id="backup-last" style="font-size:11px;color:var(--tx2);text-align:center"></div>
+  </div>
+</div>
 
 <nav class="tabs">
   <div class="tab active" onclick="switchTab('pix')">🔑 Chaves PIX</div>
@@ -2974,6 +3013,90 @@ function renderMonLog(evs){
 
 // Escuta a extensão mandar eventos em tempo real
 window.addEventListener('dp_events_synced', ()=>{ if(curTab==='monitor') renderMonitor(); });
+
+// =================== BACKUP ===================
+function openBackup(){
+  const modal = document.getElementById('backup-modal');
+  modal.style.display = 'flex';
+  const last = localStorage.getItem('dp_last_backup');
+  const info = document.getElementById('backup-last');
+  if(last && info){
+    const d = new Date(last).toLocaleString('pt-BR');
+    info.textContent = `Último backup exportado: ${d}`;
+  } else if(info){
+    info.textContent = 'Nenhum backup exportado ainda neste dispositivo';
+  }
+}
+
+function closeBackup(){
+  document.getElementById('backup-modal').style.display = 'none';
+}
+
+// Fecha modal ao clicar fora
+document.getElementById('backup-modal')?.addEventListener('click', function(e){
+  if(e.target === this) closeBackup();
+});
+
+function exportBackup(){
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0,10);
+  const timeStr = now.toTimeString().slice(0,5).replace(':','-');
+
+  const data = {
+    version: '1.0',
+    exportedAt: now.toISOString(),
+    app: 'DashPRO CPA',
+    data: {
+      pix_v2:               JSON.parse(localStorage.getItem('pix_v2') || 'null'),
+      dp_platform_events:   JSON.parse(localStorage.getItem('dp_platform_events') || '[]'),
+      dashpro_goals:        JSON.parse(localStorage.getItem('dashpro_goals') || 'null'),
+    }
+  };
+
+  // Remove entradas nulas
+  Object.keys(data.data).forEach(k => { if(data.data[k] === null) delete data.data[k]; });
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `dashpro-backup-${dateStr}_${timeStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  localStorage.setItem('dp_last_backup', now.toISOString());
+  const info = document.getElementById('backup-last');
+  if(info) info.textContent = `Backup exportado: ${now.toLocaleString('pt-BR')}`;
+
+  // Feedback visual no botão
+  const btn = document.querySelector('#backup-modal button[onclick="exportBackup()"]');
+  if(btn){ const orig=btn.textContent; btn.textContent='✅ Backup baixado!'; setTimeout(()=>btn.textContent=orig,2500); }
+}
+
+function importBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const backup = JSON.parse(e.target.result);
+      if(!backup.data) throw new Error('Arquivo inválido');
+
+      if(!confirm(`Restaurar backup de ${new Date(backup.exportedAt).toLocaleString('pt-BR')}?\n\nIsso substituirá TODOS os dados atuais.`)) return;
+
+      if(backup.data.pix_v2)             localStorage.setItem('pix_v2', JSON.stringify(backup.data.pix_v2));
+      if(backup.data.dp_platform_events) localStorage.setItem('dp_platform_events', JSON.stringify(backup.data.dp_platform_events));
+      if(backup.data.dashpro_goals)      localStorage.setItem('dashpro_goals', JSON.stringify(backup.data.dashpro_goals));
+
+      closeBackup();
+      alert('✅ Backup restaurado com sucesso! A página será recarregada.');
+      setTimeout(()=>location.reload(), 500);
+    } catch(err){
+      alert('❌ Arquivo inválido ou corrompido: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
 
 </script>
 
