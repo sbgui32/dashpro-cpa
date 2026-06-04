@@ -2865,88 +2865,62 @@ renderAll();renderAlert();
 setInterval(renderAlert, 60000); // atualiza a cada minuto
 
 // =================== MONITOR DE BLOCK ===================
+// =================== MONITOR ===================
 let monEvents = [];
 
 function loadMonitorEvents(){
-  try{ monEvents = JSON.parse(localStorage.getItem('dp_platform_events')||'[]'); }
-  catch(e){ monEvents=[]; }
+  try{ monEvents=JSON.parse(localStorage.getItem('dp_platform_events')||'[]'); }catch(e){ monEvents=[]; }
   return monEvents;
 }
 
-function syncMonitorEvents(){
-  const btn = document.querySelector('[onclick="syncMonitorEvents()"]');
-  if(btn){ btn.textContent='⏳ Carregando...'; btn.disabled=true; }
-  setTimeout(()=>{
-    loadMonitorEvents();
-    renderMonitor();
-    if(btn){ btn.textContent='🔄 Sincronizar'; btn.disabled=false; }
-    if(!monEvents.length) alert('Nenhum evento encontrado.\nUse o botão "📂 Importar eventos" para carregar o arquivo dashpro-events.json gerado pelo Monitor Agent.');
-  }, 300);
+function saveMonitorEvents(){
+  localStorage.setItem('dp_platform_events', JSON.stringify(monEvents));
+}
+
+function logMonEvent(platform, eventType){
+  loadMonitorEvents();
+  const ev = {
+    id: Date.now(),
+    eventType,
+    platform,
+    timestamp: new Date().toISOString(),
+  };
+  monEvents.unshift(ev);
+  if(monEvents.length > 500) monEvents.pop();
+  saveMonitorEvents();
+  renderMonitor();
+
+  // Flash visual no card da plataforma
+  const card = document.getElementById('mon-card-'+platform);
+  if(card){
+    const col = eventType==='block' ? '#f85149' : '#e3b341';
+    card.style.borderColor = col;
+    card.style.boxShadow = `0 0 0 2px ${col}40`;
+    setTimeout(()=>{ card.style.borderColor=''; card.style.boxShadow=''; }, 1000);
+  }
 }
 
 function clearMonitorEvents(){
-  if(!confirm('Limpar todo o histórico de monitoramento?')) return;
+  if(!confirm('Limpar todo o histórico?')) return;
   localStorage.removeItem('dp_platform_events');
   monEvents=[];
   renderMonitor();
 }
 
-function getFilteredEvents(){
-  loadMonitorEvents();
-  const plat = ($('mon-plat')||{}).value||'';
-  const type = ($('mon-type')||{}).value||'';
-  const days = parseInt(($('mon-period')||{}).value||'7');
-  let evs = monEvents;
-  if(plat) evs=evs.filter(e=>e.platform===plat);
-  if(type) evs=evs.filter(e=>e.eventType===type);
-  if(days>0){ const cut=Date.now()-days*86400000; evs=evs.filter(e=>new Date(e.timestamp).getTime()>cut); }
-  return evs;
-}
-
 function renderMonitor(){
-  const evs = getFilteredEvents();
-  const empty = $('mon-empty');
-  if(!monEvents.length){
-    if(empty) empty.classList.remove('hidden');
-    ['mon-cards','mon-chart-plat','mon-chart-hour','mon-log'].forEach(id=>{ if($(id))$(id).innerHTML=''; });
-    if($('mon-count'))$('mon-count').textContent='';
-    return;
-  }
-  if(empty) empty.classList.add('hidden');
-  renderMonCards(evs);
-  renderMonChartPlat(evs);
-  renderMonChartHour(evs);
-  renderMonLog(evs);
-}
-
-function renderMonCards(evs){
-  const total=evs.length, blocks=evs.filter(e=>e.eventType==='block').length, discs=evs.filter(e=>e.eventType==='disconnect').length;
-  const pc={}; evs.forEach(e=>pc[e.platform]=(pc[e.platform]||0)+1);
-  const topP=Object.entries(pc).sort((a,b)=>b[1]-a[1])[0];
-  const hc={}; evs.forEach(e=>{ const h=new Date(e.timestamp).getHours(); hc[h]=(hc[h]||0)+1; });
-  const topH=Object.entries(hc).sort((a,b)=>b[1]-a[1])[0];
-  const cards=[
-    {icon:'📊',val:total,    lbl:'Total eventos',         col:'var(--gr)'},
-    {icon:'🚫',val:blocks,   lbl:'Bloqueios',             col:'#f85149'},
-    {icon:'⚠️', val:discs,   lbl:'Disconnects',           col:'#e3b341'},
-    {icon:'🎯',val:topP?`${topP[0]} (${topP[1]}x)`:'—',  lbl:'Plat. mais bloqueada', col:'#f97316'},
-    {icon:'🕐',val:topH?`${topH[0]}h–${(+topH[0]+1)%24}h`:'—', lbl:'Horário mais perigoso', col:'#8b5cf6'},
-  ];
-  $('mon-cards').innerHTML=cards.map(c=>`
-    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:12px">
-      <div style="font-size:20px;margin-bottom:4px">${c.icon}</div>
-      <div style="font-size:22px;font-weight:800;color:${c.col};line-height:1">${c.val}</div>
-      <div style="font-size:11px;color:var(--tx2);margin-top:3px">${c.lbl}</div>
-    </div>`).join('');
+  loadMonitorEvents();
+  renderMonChartPlat(monEvents);
+  renderMonChartHour(monEvents);
+  renderMonLog(monEvents);
 }
 
 function renderMonChartPlat(evs){
+  const el=$('mon-chart-plat'); if(!el)return;
   const pc={};
-  evs.forEach(e=>{ if(!pc[e.platform])pc[e.platform]={block:0,disconnect:0}; pc[e.platform][e.eventType]++; });
+  evs.forEach(e=>{ if(!pc[e.platform])pc[e.platform]={block:0,disconnect:0}; if(pc[e.platform][e.eventType]!==undefined)pc[e.platform][e.eventType]++; });
   const entries=Object.entries(pc).sort((a,b)=>(b[1].block+b[1].disconnect)-(a[1].block+a[1].disconnect));
-  const mx=Math.max(...entries.map(([,v])=>v.block+v.disconnect),1);
-  if(!entries.length){ $('mon-chart-plat').innerHTML='<div style="color:var(--tx2);font-size:12px;text-align:center;padding:24px">Sem dados no período</div>'; return; }
-  $('mon-chart-plat').innerHTML=entries.map(([plat,c])=>{
+  if(!entries.length){ el.innerHTML='<div style="color:var(--tx2);font-size:12px;text-align:center;padding:20px">Nenhum evento registrado ainda</div>'; return; }
+  el.innerHTML=entries.map(([plat,c])=>{
     const tot=c.block+c.disconnect;
     const bp=tot>0?(c.block/tot*100).toFixed(1):0;
     const dp=tot>0?(c.disconnect/tot*100).toFixed(1):0;
@@ -2955,11 +2929,11 @@ function renderMonChartPlat(evs){
         <span style="font-size:13px;font-weight:700">${plat}</span>
         <span style="font-size:11px;color:var(--tx2)">${tot} evento${tot>1?'s':''}</span>
       </div>
-      <div style="height:22px;background:var(--bd);border-radius:4px;overflow:hidden;display:flex">
+      <div style="height:20px;background:var(--bd);border-radius:4px;overflow:hidden;display:flex">
         <div style="width:${bp}%;background:#f85149" title="Bloqueios: ${c.block}"></div>
         <div style="width:${dp}%;background:#e3b341" title="Disconnects: ${c.disconnect}"></div>
       </div>
-      <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--tx2)">
+      <div style="display:flex;gap:12px;margin-top:3px;font-size:10px">
         <span style="color:#f85149">🚫 ${c.block} bloq.</span>
         <span style="color:#e3b341">⚠️ ${c.disconnect} disc.</span>
       </div>
@@ -2968,86 +2942,52 @@ function renderMonChartPlat(evs){
 }
 
 function renderMonChartHour(evs){
+  const el=$('mon-chart-hour'); if(!el)return;
   const hc=Array.from({length:24},(_,i)=>({h:i,block:0,disconnect:0}));
-  evs.forEach(e=>{ const h=new Date(e.timestamp).getHours(); hc[h][e.eventType]++; });
+  evs.forEach(e=>{ const h=new Date(e.timestamp).getHours(); if(hc[h][e.eventType]!==undefined)hc[h][e.eventType]++; });
   const mx=Math.max(...hc.map(h=>h.block+h.disconnect),1);
   const hasData=hc.some(h=>h.block+h.disconnect>0);
-  if(!hasData){ $('mon-chart-hour').innerHTML='<div style="color:var(--tx2);font-size:12px;text-align:center;padding:24px">Sem dados no período</div>'; return; }
-  $('mon-chart-hour').innerHTML=`
-    <div style="display:flex;align-items:flex-end;gap:2px;height:72px;margin-bottom:4px">
-      ${hc.map(h=>{
-        const tot=h.block+h.disconnect;
-        const pct=tot>0?(tot/mx*100):2;
-        const col=tot>=3?'#f85149':tot>0?'#e3b341':'var(--bd)';
-        return `<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end" title="${h.h}h: ${tot} evento(s)">
-          <div style="width:100%;background:${col};height:${pct}%;min-height:${tot>0?'4px':'2px'};border-radius:2px 2px 0 0"></div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div style="display:flex;gap:2px">
-      ${hc.map((h,i)=>`<div style="flex:1;text-align:center;font-size:8px;color:${h.block+h.disconnect>0?'var(--tx)':'var(--tx2)'}">${i%6===0?i+'h':''}</div>`).join('')}
-    </div>
-    <div style="display:flex;gap:14px;margin-top:8px;font-size:10px;color:var(--tx2)">
-      <span><span style="color:#f85149">■</span> 3+ eventos (perigo)</span>
-      <span><span style="color:#e3b341">■</span> 1–2 eventos</span>
-    </div>`;
+  if(!hasData){ el.innerHTML='<div style="color:var(--tx2);font-size:12px;text-align:center;padding:20px">Nenhum evento ainda</div>'; return; }
+  el.innerHTML=`<div style="display:flex;align-items:flex-end;gap:2px;height:68px;margin-bottom:4px">${hc.map(h=>{
+    const tot=h.block+h.disconnect,pct=tot>0?(tot/mx*100):2,col=tot>=3?'#f85149':tot>0?'#e3b341':'var(--bd)';
+    return `<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end" title="${h.h}h: ${tot}"><div style="width:100%;background:${col};height:${pct}%;min-height:${tot>0?'4px':'2px'};border-radius:2px 2px 0 0"></div></div>`;
+  }).join('')}</div>
+  <div style="display:flex;gap:2px">${hc.map((h,i)=>`<div style="flex:1;text-align:center;font-size:8px;color:${h.block+h.disconnect>0?'var(--tx)':'var(--tx2)'}">${i%6===0?i+'h':''}</div>`).join('')}</div>
+  <div style="display:flex;gap:14px;margin-top:6px;font-size:10px;color:var(--tx2)"><span><span style="color:#f85149">■</span> 3+</span><span><span style="color:#e3b341">■</span> 1–2</span></div>`;
 }
 
 function renderMonLog(evs){
-  if($('mon-count'))$('mon-count').textContent=`${evs.length} evento${evs.length!==1?'s':''}`;
-  if(!evs.length){ $('mon-log').innerHTML='<div style="padding:24px;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento no período selecionado</div>'; return; }
+  const el=$('mon-log'); const cnt=$('mon-count'); if(!el)return;
+  if(cnt) cnt.textContent=`${evs.length} evento${evs.length!==1?'s':''}`;
+  if(!evs.length){ el.innerHTML='<div style="padding:24px;text-align:center;color:var(--tx2);font-size:12px">Nenhum evento registrado ainda.<br>Use os botões acima para marcar blocks e disconnects.</div>'; return; }
   const sorted=[...evs].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-  $('mon-log').innerHTML=sorted.map(ev=>{
+  el.innerHTML=sorted.map((ev,i)=>{
     const dt=new Date(ev.timestamp);
     const d=dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'});
     const t=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const isB=ev.eventType==='block';
     const dot=isB?'#f85149':'#e3b341';
     const badge=isB
-      ?`<span style="background:rgba(248,81,73,.12);color:#f85149;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600">🚫 Bloqueio</span>`
+      ?`<span style="background:rgba(248,81,73,.12);color:#f85149;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600">🚫 Block</span>`
       :`<span style="background:rgba(227,179,65,.12);color:#e3b341;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600">⚠️ Disconnect</span>`;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bg)">
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--bg)">
       <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-      <div style="font-weight:700;min-width:32px">${ev.platform}</div>
+      <div style="font-weight:700;min-width:32px;font-size:13px">${ev.platform}</div>
       ${badge}
       <div style="margin-left:auto;color:var(--tx2);font-size:11px;white-space:nowrap">${d} ${t}</div>
-      ${ev.errorCode?`<div style="font-family:monospace;font-size:10px;color:var(--tx2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${ev.errorCode}">${ev.errorCode}</div>`:''}
+      <button onclick="removeMonEvent(${i})" style="background:none;border:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:0 2px;opacity:.5" title="Remover">✕</button>
     </div>`;
   }).join('');
 }
 
-// Escuta a extensão mandar eventos em tempo real
-window.addEventListener('dp_events_synced', ()=>{ if(curTab==='monitor') renderMonitor(); });
-
-function importMonitorFile(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const backup = JSON.parse(e.target.result);
-      const incoming = backup.data?.dp_platform_events || [];
-      if(!incoming.length){ alert('Nenhum evento encontrado no arquivo.'); return; }
-
-      // Mescla com eventos existentes sem duplicar
-      loadMonitorEvents();
-      const existingIds = new Set(monEvents.map(ev => ev.id || (ev.eventType+ev.platform+ev.timestamp)));
-      const novos = incoming.filter(ev => !existingIds.has(ev.id || (ev.eventType+ev.platform+ev.timestamp)));
-      const merged = [...novos, ...monEvents].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,500);
-      localStorage.setItem('dp_platform_events', JSON.stringify(merged));
-      monEvents = merged;
-      renderMonitor();
-
-      // Feedback
-      const lbl = event.target.closest('label');
-      if(lbl){ const orig=lbl.innerHTML; lbl.innerHTML=`✅ ${novos.length} novos eventos`; setTimeout(()=>lbl.innerHTML=orig,3000); }
-      if(novos.length===0) alert('Todos os eventos já estavam registrados.');
-    } catch(err){
-      alert('❌ Arquivo inválido: '+err.message);
-    }
-  };
-  reader.readAsText(file);
-  event.target.value=''; // permite reimportar o mesmo arquivo
+function removeMonEvent(idx){
+  loadMonitorEvents();
+  const sorted=[...monEvents].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  const toRemove=sorted[idx];
+  if(!toRemove)return;
+  monEvents=monEvents.filter(e=>e.id!==toRemove.id);
+  saveMonitorEvents();
+  renderMonitor();
 }
 
 // =================== BACKUP ===================
@@ -3146,67 +3086,82 @@ function importBackup(event){
 </footer>
 <!-- ==================== MONITOR TAB ==================== -->
 <div id="tab-monitor" class="hidden layout" style="flex-direction:column">
-  <div class="main" style="padding:18px;max-width:1200px;margin:0 auto;width:100%">
+  <div class="main" style="padding:18px;max-width:900px;margin:0 auto;width:100%">
 
-    <!-- Toolbar -->
-    <div class="toolbar" style="margin-bottom:14px">
-      <select class="fil" id="mon-plat" onchange="renderMonitor()">
-        <option value="">Todas plataformas</option>
-        <option>VOY</option><option>W1</option><option>WE</option>
-        <option>91</option><option>DZ</option><option>A8</option>
-      </select>
-      <select class="fil" id="mon-type" onchange="renderMonitor()">
-        <option value="">Todos os tipos</option>
-        <option value="disconnect">Disconnect</option>
-        <option value="block">Bloqueio</option>
-      </select>
-      <select class="fil" id="mon-period" onchange="renderMonitor()">
-        <option value="7">Últimos 7 dias</option>
-        <option value="30">Últimos 30 dias</option>
-        <option value="0">Tudo</option>
-      </select>
-      <button class="btn btn-o" onclick="syncMonitorEvents()" title="Sincronizar com extensão">🔄 Sincronizar</button>
-      <label class="btn" style="background:var(--gr);color:#000;font-weight:700;cursor:pointer;position:relative;overflow:hidden" title="Importar dashpro-events.json do Monitor Agent">
-        📂 Importar eventos
-        <input type="file" accept=".json" onchange="importMonitorFile(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer">
-      </label>
-      <button class="btn btn-d btn-sm" onclick="clearMonitorEvents()">🗑️ Limpar</button>
+    <!-- Título -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:16px;font-weight:800;margin-bottom:2px">🛡️ Monitoramento de Block</div>
+      <div style="font-size:12px;color:var(--tx2)">Registre manualmente quando uma plataforma tomar block ou disconnect</div>
     </div>
 
-    <!-- Cards de resumo -->
-    <div id="mon-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px"></div>
+    <!-- Grid de plataformas -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+      <div id="mon-card-VOY" class="mon-plat-card" onclick="" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">VOY</div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <button onclick="logMonEvent('VOY','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
+          <button onclick="logMonEvent('VOY','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+        </div>
+      </div>
+      <div id="mon-card-91" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">91</div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <button onclick="logMonEvent('91','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
+          <button onclick="logMonEvent('91','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+        </div>
+      </div>
+      <div id="mon-card-W1" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">W1</div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <button onclick="logMonEvent('W1','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
+          <button onclick="logMonEvent('W1','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+        </div>
+      </div>
+      <div id="mon-card-WE" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">WE</div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <button onclick="logMonEvent('WE','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
+          <button onclick="logMonEvent('WE','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+        </div>
+      </div>
+      <div id="mon-card-A8" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">A8</div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <button onclick="logMonEvent('A8','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
+          <button onclick="logMonEvent('A8','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+        </div>
+      </div>
+      <div id="mon-card-DZ" class="mon-plat-card" style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:900;letter-spacing:1px;margin-bottom:10px">DZ</div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <button onclick="logMonEvent('DZ','block')" style="flex:1;background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">🚫 Block</button>
+          <button onclick="logMonEvent('DZ','disconnect')" style="flex:1;background:rgba(227,179,65,.15);border:1px solid #e3b341;color:#e3b341;border-radius:6px;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer">⚠️ Disc.</button>
+        </div>
+      </div>
+    </div>
 
-    <!-- Gráficos lado a lado -->
+    <!-- Gráficos -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
       <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px">
-          📊 <span>Eventos por plataforma</span>
-        </div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:12px">📊 Eventos por plataforma</div>
         <div id="mon-chart-plat"></div>
       </div>
       <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px">
-          🕐 <span>Eventos por horário</span>
-        </div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:12px">🕐 Eventos por horário</div>
         <div id="mon-chart-hour"></div>
       </div>
     </div>
 
-    <!-- Tabela de eventos -->
+    <!-- Log -->
     <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;font-weight:700">📋 Log de eventos</span>
-        <span id="mon-count" style="font-size:11px;color:var(--tx2)"></span>
+        <span style="font-size:12px;font-weight:700">📋 Histórico</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="mon-count" style="font-size:11px;color:var(--tx2)"></span>
+          <button onclick="clearMonitorEvents()" style="background:none;border:1px solid var(--bd);color:var(--tx2);border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer">🗑️ Limpar</button>
+        </div>
       </div>
-      <div id="mon-log" style="max-height:340px;overflow-y:auto"></div>
-    </div>
-
-    <!-- Estado vazio -->
-    <div id="mon-empty" class="hidden" style="text-align:center;padding:48px 24px;color:var(--tx2)">
-      <div style="font-size:36px;margin-bottom:10px">🛡️</div>
-      <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:6px">Nenhum evento registrado</div>
-      <div style="font-size:13px;line-height:1.7">Instale a extensão <strong style="color:var(--gr)">DashPRO Monitor</strong> no Chrome.<br>
-      Ela detecta disconnects e bloqueios automaticamente e registra aqui.</div>
+      <div id="mon-log" style="max-height:320px;overflow-y:auto"></div>
     </div>
 
   </div>
