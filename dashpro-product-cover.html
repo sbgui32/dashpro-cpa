@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1200px;
+  height: 628px;
+  background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  color: #e6edf3;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Gradient background */
+.bg-grad {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 900px 700px at 50% 0%, rgba(16,185,129,.15) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 400px at 0% 100%, rgba(16,185,129,.08) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.container {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 60px 80px;
+  gap: 60px;
+}
+
+/* LEFT SIDE - Content */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16,185,129,.15);
+  border: 1px solid rgba(16,185,129,.4);
+  border-radius: 99px;
+  padding: 8px 18px;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 700;
+  color: #10b981;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.title em {
+  color: #10b981;
+  font-style: normal;
+}
+
+.subtitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #8b949e;
+  line-height: 1.4;
+  max-width: 500px;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #c9d1d9;
+}
+
+.feature-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #10b981;
+  color: #000;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 14px 32px;
+  border-radius: 12px;
+  width: fit-content;
+  margin-top: 10px;
+  box-shadow: 0 8px 32px rgba(16,185,129,.3);
+}
+
+/* RIGHT SIDE - Visual */
+.visual {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.dashboard-preview {
+  position: relative;
+  width: 380px;
+  height: 420px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow:
+    0 0 60px rgba(16,185,129,.2),
+    0 20px 80px rgba(0,0,0,.6);
+  overflow: hidden;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #21262d;
+}
+
+.dashboard-icon {
+  width: 32px;
+  height: 32px;
+  background: #10b981;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #000;
+}
+
+.dashboard-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.dashboard-subtitle {
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  padding: 8px;
+  background: #0d1117;
+  border-radius: 6px;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  color: #10b981;
+  border-bottom-color: #10b981;
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stat-card {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.stat-label {
+  color: #8b949e;
+}
+
+.stat-value {
+  font-weight: 800;
+  color: #10b981;
+  font-size: 16px;
+}
+
+/* Floating element */
+.float-badge {
+  position: absolute;
+  bottom: -20px;
+  right: -30px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(16,185,129,.1) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grad"></div>
+
+<div class="container">
+  <!-- LEFT -->
+  <div class="content">
+    <div class="badge">✨ Lançamento</div>
+
+    <div class="title">Dash<em>PRO</em> CPA</div>
+
+    <div class="subtitle">Gerenciador profissional de chaves PIX para operadores CPA</div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">🔑</div>
+        <div>Organize até 5 chaves por banco</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💰</div>
+        <div>Controle financeiro completo</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🛡️</div>
+        <div>Monitor de blocks e disconnects</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <div>Funciona offline 100%</div>
+      </div>
+    </div>
+
+    <div class="cta">🚀 Comece agora — 3 dias grátis</div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="visual">
+    <div class="dashboard-preview">
+      <div class="dashboard-header">
+        <div class="dashboard-icon">🔑</div>
+        <div>
+          <div class="dashboard-title">DashPRO</div>
+          <div class="dashboard-subtitle">Offline · Sincronizado</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">🔑 Chaves</div>
+        <div class="tab">💰 Fin</div>
+        <div class="tab">🛡️ Monitor</div>
+      </div>
+
+      <div class="dashboard-content">
+        <div class="stat-card">
+          <div class="stat-label">Bancos</div>
+          <div class="stat-value">6</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Chaves PIX</div>
+          <div class="stat-value">28</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Disponíveis</div>
+          <div class="stat-value" style="color:#10b981">18</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Em uso</div>
+          <div class="stat-value" style="color:#e3b341">10</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ROI (7 dias)</div>
+          <div class="stat-value" style="color:#10b981">+R$ 2.847</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="float-badge"></div>
+  </div>
+</div>
+
+</body>
+</html>

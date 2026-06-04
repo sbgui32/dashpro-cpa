@@ -7,18 +7,14 @@
 <title>DashPRO CPA</title>
 
 <!-- =====================================================
-     DASHPRO AUTH CONFIG
-     Preencha com suas credenciais antes do deploy
+     DASHPRO CONFIG
      ===================================================== -->
 <script>
 const DASHPRO = {
-  supabaseUrl:  'https://xgmijgpqivsofmfpkjpf.supabase.co',
-  supabaseKey:  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnbWlqZ3BxaXZzb2ZtZnBranBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTMxNTMsImV4cCI6MjA5NjA4OTE1M30.jGZft22FX7UAS8pFm1c6EfjUQWHlyyBq8tiou5rradk',
-  checkoutUrl:  'https://dashpro-cpa.vercel.app/api/checkout',
-  price:        'R$ 34,90/mês'
+  kiwifyUrl: 'https://pay.kiwify.com.br/gPxmpEA',
+  price: 'R$ 34,90/mês'
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
 <style>
 /* === DASHPRO AUTH OVERLAY === */
@@ -244,8 +240,19 @@ textarea{resize:vertical;min-height:70px}
 </head>
 <body>
 
-<!-- ==================== DASHPRO AUTH OVERLAY ==================== -->
-<div id="dp-overlay">
+<!-- ==================== DASHPRO TRIAL BANNER ==================== -->
+<div id="dp-trial-banner" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#10b981,#059669);color:#000;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;z-index:10000;font-weight:600;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.3);height:44px">
+  <div>
+    <span id="dp-trial-text">✓ Você está usando a versão de teste — 3 dias grátis</span>
+    <span id="dp-trial-days" style="margin-left:12px;font-weight:700"></span>
+  </div>
+  <a href="javascript:void(0)" onclick="dpOpenKiwify()" style="background:rgba(0,0,0,.2);color:#000;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:700;white-space:nowrap;cursor:pointer;transition:all .2s">
+    Continuar agora →
+  </a>
+</div>
+
+<!-- HIDDEN OVERLAY (para compatibilidade com script antigo) -->
+<div id="dp-overlay" style="display:none">
 
   <!-- Logo (aparece em todas as telas) -->
   <div class="dp-logo">
@@ -3300,174 +3307,73 @@ function importBackup(event){
   </div>
 </div>
 
-<!-- ==================== DASHPRO AUTH SCRIPT ==================== -->
+<!-- ==================== DASHPRO TRIAL SCRIPT ==================== -->
 <script>
 (function(){
-  const _sb = window.supabase.createClient(DASHPRO.supabaseUrl, DASHPRO.supabaseKey);
-  const apiBase = 'https://dashpro-cpa.vercel.app/api';
+  const TRIAL_DAYS = 3;
+  const TRIAL_KEY = 'dashpro_trial_start';
+  const BANNER = document.getElementById('dp-trial-banner');
+  const BANNER_TEXT = document.getElementById('dp-trial-text');
+  const BANNER_DAYS = document.getElementById('dp-trial-days');
+  const WA_BTN = document.getElementById('whatsapp-btn');
 
-  function dpShow(screenId){
-    document.querySelectorAll('.dp-screen').forEach(s=>s.classList.remove('active'));
-    const el=document.getElementById(screenId);
-    if(el)el.classList.add('active');
+  function dpOpenKiwify(){
+    window.open(DASHPRO.kiwifyUrl, '_blank');
   }
-  window.dpShow=dpShow;
+  window.dpOpenKiwify = dpOpenKiwify;
 
-  function dpHideOverlay(){
-    const ov=document.getElementById('dp-overlay');
-    if(ov)ov.style.display='none';
-    // Mostrar botão do grupo VIP apenas para assinantes logados
-    const wb=document.getElementById('whatsapp-btn');
-    if(wb)wb.style.display='inline-flex';
-  }
-
-  async function dpInit(){
-    // Se voltou do Stripe com sucesso, aguarda o webhook processar
-    const params=new URLSearchParams(window.location.search);
-    if(params.get('payment')==='success'){
-      dpShow('dp-loading');
-      document.querySelector('#dp-loading').innerHTML='<span class="dp-spin"></span> Ativando sua assinatura...';
-      await new Promise(r=>setTimeout(r,3000));
-      window.history.replaceState({},'',window.location.pathname);
-    }
-    dpShow('dp-loading');
-    const {data:{session}}=await _sb.auth.getSession();
-    if(!session){dpShow('dp-login');return;}
-    await dpCheckSub(session);
-  }
-
-  async function dpCheckSub(session){
-    dpShow('dp-loading');
-    const {data:sub}=await _sb
-      .from('subscriptions')
-      .select('status,trial_end,current_period_end,is_trial_only')
-      .eq('user_id',session.user.id)
-      .in('status',['active','trialing'])
-      .maybeSingle();
-
-    if(sub){
-      const now=new Date();
-      const end=sub.current_period_end?new Date(sub.current_period_end):null;
-
-      // Verificar se trial/subscription está válido
-      if(sub.status==='active'||end>now){
-        dpHideOverlay();
-        return;
-      }
-    }
-
-    // Trial expirado ou não tem subscription — mostrar upgrade
-    dpShow('dp-payment');
-    document.getElementById('dp-payment-title').textContent='Seu trial expirou';
-    document.getElementById('dp-payment-sub').textContent='Assine agora para continuar usando:';
-    document.getElementById('dp-trial-note').textContent='Sem compromisso · Cancele quando quiser';
-  }
-
-  async function dpLogin(){
-    const email=document.getElementById('dp-l-email').value.trim();
-    const pass=document.getElementById('dp-l-pass').value;
-    const err=document.getElementById('dp-l-err');
-    const btn=document.getElementById('dp-l-btn');
-    err.textContent='';
-    if(!email||!pass){err.textContent='Preencha email e senha';return;}
-    btn.disabled=true;btn.textContent='Entrando...';
-    const {data,error}=await _sb.auth.signInWithPassword({email,password:pass});
-    btn.disabled=false;btn.textContent='Entrar';
-    if(error){
-      err.textContent=error.message.includes('Invalid login')?'Email ou senha incorretos':error.message;
+  function updateTrialBanner(){
+    const startStr = localStorage.getItem(TRIAL_KEY);
+    if(!startStr){
+      // Primeira vez — iniciar trial
+      const now = new Date();
+      localStorage.setItem(TRIAL_KEY, now.toISOString());
+      BANNER.style.display = 'flex';
+      BANNER.style.paddingTop = '44px'; // offset do header
+      updateTrialBanner(); // Chamar de novo para atualizar
       return;
     }
-    await dpCheckSub(data.session);
-  }
-  window.dpLogin=dpLogin;
 
-  async function dpRegister(){
-    const email=document.getElementById('dp-r-email').value.trim();
-    const pass=document.getElementById('dp-r-pass').value;
-    const err=document.getElementById('dp-r-err');
-    const btn=document.getElementById('dp-r-btn');
-    err.textContent='';
-    if(!email||!pass){err.textContent='Preencha email e senha';return;}
-    if(pass.length<6){err.textContent='Senha deve ter no mínimo 6 caracteres';return;}
-    btn.disabled=true;btn.textContent='Criando conta...';
-    const {data,error}=await _sb.auth.signUp({email,password:pass});
-    btn.disabled=false;btn.textContent='Criar conta e começar';
-    if(error){err.textContent=error.message;return;}
-    if(data.session){
-      // Ativar trial automaticamente
-      await dpActivateTrial(data.session);
+    const start = new Date(startStr);
+    const now = new Date();
+    const elapsedMs = now - start;
+    const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+    const remainingDays = TRIAL_DAYS - elapsedDays;
+
+    if(remainingDays > 0){
+      // Trial ainda ativo
+      BANNER.style.display = 'flex';
+      document.body.style.paddingTop = '44px'; // Dar espaço para o banner
+
+      const hours = Math.floor((remainingDays % 1) * 24);
+      const daysInt = Math.floor(remainingDays);
+      BANNER_DAYS.textContent = `${daysInt}d ${hours}h restante`;
+      BANNER_TEXT.textContent = '✓ Você está usando a versão de teste';
     } else {
-      dpShow('dp-login');
-      document.getElementById('dp-l-err').style.color='#10b981';
-      document.getElementById('dp-l-err').textContent='✅ Conta criada! Verifique seu email e faça login.';
-    }
-  }
-  window.dpRegister=dpRegister;
-
-  async function dpActivateTrial(session){
-    dpShow('dp-loading');
-    document.querySelector('#dp-loading').innerHTML='<span class="dp-spin"></span> Ativando seu trial de 3 dias...';
-
-    try{
-      const res=await fetch(`${apiBase}/check-trial`,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'}
-      });
-      const json=await res.json();
-
-      if(json.canTrial){
-        // Trial ativado com sucesso
-        await new Promise(r=>setTimeout(r,1500));
-        dpHideOverlay();
-      } else {
-        // Não pode fazer trial (IP já tem trial ativo)
-        dpShow('dp-payment');
-        document.getElementById('dp-payment-title').textContent='Limite de trial atingido';
-        document.getElementById('dp-payment-sub').textContent=json.reason||'Você já utilizou o trial neste dispositivo. Assine para continuar:';
-        document.getElementById('dp-trial-note').textContent='';
-      }
-    }catch(e){
-      console.error('[dpActivateTrial] Error:', e);
-      dpShow('dp-payment');
-      document.getElementById('dp-p-err').textContent='Erro ao ativar trial: '+e.message;
+      // Trial expirado
+      BANNER.style.display = 'flex';
+      BANNER.style.background = 'linear-gradient(90deg,#f85149,#da3633)';
+      BANNER.style.paddingTop = '44px';
+      BANNER_TEXT.textContent = '❌ Seu período de teste expirou!';
+      BANNER_DAYS.textContent = 'Assine agora para continuar';
+      document.body.style.paddingTop = '44px';
     }
   }
 
-  async function dpUpgrade(){
-    const btn=document.getElementById('dp-p-btn');
-    const err=document.getElementById('dp-p-err');
-    err.textContent='';
-    btn.disabled=true;
-    btn.innerHTML='<span class="dp-spin"></span> Redirecionando...';
-    const {data:{session}}=await _sb.auth.getSession();
-    if(!session){dpShow('dp-login');return;}
-    try{
-      const res=await fetch(`${apiBase}/upgrade-trial`,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'}
-      });
-      const json=await res.json();
-      if(json.url){window.location.href=json.url;}
-      else throw new Error(json.error||'Erro ao criar checkout');
-    }catch(e){
-      err.textContent=e.message;
-      btn.disabled=false;
-      btn.innerHTML='💳 Assinar agora';
-    }
-  }
-  window.dpUpgrade=dpUpgrade;
+  // Atualizar banner ao carregar
+  updateTrialBanner();
 
-  async function dpLogout(){
-    await _sb.auth.signOut();
-    location.reload();
-  }
-  window.dpLogout=dpLogout;
+  // Atualizar a cada 1 minuto
+  setInterval(updateTrialBanner, 60000);
 
-  // Iniciar
-  dpInit();
+  // Mostrar WhatsApp após fazer upgrade (quando vir de Kiwify)
+  const params = new URLSearchParams(window.location.search);
+  if(params.has('upgrade') || params.has('pago')){
+    WA_BTN.style.display = 'inline-flex';
+  }
 })();
 </script>
-<!-- ==================== FIM AUTH SCRIPT ==================== -->
+<!-- ==================== FIM TRIAL SCRIPT ==================== -->
 
 </body>
 </html>
