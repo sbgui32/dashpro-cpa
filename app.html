@@ -1248,10 +1248,12 @@ function renderBankList(){
     if(ex){
       if(bKeys.length){
         keysHtml=`<div style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px;display:flex;flex-direction:column;gap:3px">
-          ${bKeys.map(k=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--bg);border-radius:5px">
+          ${bKeys.map(k=>`<div style="display:flex;align-items:center;gap:4px;padding:5px 7px;background:var(--bg);border-radius:5px">
             <span class="phone" style="font-size:12px;flex:1">${stripCC(k.phone)}</span>
             ${k.titular?`<span style="font-size:10px;color:var(--tx2);max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.titular)}</span>`:''}
             <button class="bic" onclick="event.stopPropagation();copyPhone('${k.phone}')" title="Copiar" style="padding:3px 5px">📋</button>
+            <button class="bic" onclick="event.stopPropagation();openAddKey('${k.id}')" title="Editar" style="padding:3px 5px">✏️</button>
+            <button class="bic r" onclick="event.stopPropagation();deleteKey('${k.id}')" title="Excluir" style="padding:3px 5px">🗑️</button>
           </div>`).join('')}
           <button class="btn btn-sm btn-o" style="width:100%;justify-content:center;margin-top:4px;gap:5px" onclick="event.stopPropagation();copyAllKeys('${b.id}')">📋 Copiar todas (${cnt})</button>
         </div>`;
